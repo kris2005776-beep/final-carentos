@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carent Mobile App Simulator</title>
+    <!-- Tailwind CSS dla ekspresowego i pięknego stylowania -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Ikony FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            850: '#1e293b',
+                            950: '#030712',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Ukrywanie scrollbara przy zachowaniu możliwości przewijania */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Animacja pulsującego radaru na mapie GPS */
+        @keyframes pulse-radar {
+            0% { transform: scale(1); opacity: 0.8; }
+            100% { transform: scale(3.5); opacity: 0; }
+        }
+        .radar-wave {
+            animation: pulse-radar 2s infinite linear;
+        }
+
+        /* Animacja obrotu wirtualnej kierownicy */
+        .steering-wheel-rotate {
+            transition: transform 0.5s ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-4 overflow-x-hidden">
+
+    <!-- OBUDOWA TELEFONU (iPhone 15 Pro Max Simulator) -->
+    <div class="relative w-[400px] h-[840px] bg-slate-950 rounded-[55px] border-[10px] border-slate-800 shadow-[0_0_50px_rgba(30,41,59,0.3)] flex flex-col overflow-hidden">
+        
+        <!-- Dynamic Island (Górne wycięcie) -->
+        <div class="absolute top-3 left-1/2 transform -translate-x-1/2 w-28 h-6 bg-black rounded-full z-50 flex items-center justify-end px-2.5">
+            <div class="w-2 h-2 rounded-full bg-blue-500/80 animate-pulse"></div>
+        </div>
+
+        <!-- Pasek stanu (Status Bar) -->
+        <div class="h-10 px-6 pt-2 flex justify-between items-center text-[11px] font-semibold text-slate-400 select-none z-40 bg-slate-950/80 backdrop-blur-md">
+            <span>20:15</span>
+            <div class="flex items-center gap-1.5">
+                <i class="fa-solid fa-signal"></i>
+                <i class="fa-solid fa-wifi"></i>
+                <i class="fa-solid fa-battery-full text-emerald-400"></i>
+            </div>
+        </div>
+
+        <!-- GŁÓWNA ZAWARTOŚĆ APLIKACJI -->
+        <div class="flex-1 flex flex-col overflow-hidden relative">
+            
+            <!-- MODAL SZCZEGÓŁÓW POJAZDU (Wypożyczanie z Przyciskami Cofania) -->
+            <div id="car-details-modal" class="absolute inset-0 bg-slate-950 z-50 transform translate-y-full transition-transform duration-300 ease-out flex flex-col">
+                <!-- Nagłówek modalu z Przyciskami Cofania -->
+                <div class="p-4 flex justify-between items-center border-b border-slate-850 bg-slate-950">
+                    <button onclick="closeDetailsModal()" class="flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-white transition-all">
+                        <i class="fa-solid fa-chevron-left"></i>
+                        <span>Wróć</span>
+                    </button>
+                    <span class="text-xs font-extrabold uppercase tracking-widest text-slate-500">Karta Auta</span>
+                    <button onclick="closeDetailsModal()" class="w-8 h-8 rounded-full bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center border border-slate-800">
+                        <i class="fa-solid fa-xmark text-sm"></i>
+                    </button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto p-5 space-y-5 no-scrollbar pb-10 bg-slate-950">
+                    <!-- Prezentacja obrazu ze specjalnym tłem z gradientem -->
+                    <div class="text-center space-y-3">
+                        <div class="relative w-full h-44 bg-gradient-to-b from-slate-900 to-slate-950 rounded-2xl flex items-center justify-center p-2 border border-slate-800/80 overflow-hidden">
+                            <!-- Widok tradycyjnego zdjęcia -->
+                            <img id="modal-car-img" src="" class="max-w-full max-h-full object-contain drop-shadow-[0_10px_15px_rgba(0,0,0,0.5)]" alt="">
+                        </div>
+
+                        <h3 id="modal-car-title" class="text-xl font-extrabold text-white">Model</h3>
+                        <span id="modal-car-badge" class="bg-blue-600/20 text-blue-400 text-[10px] font-bold px-3 py-1 rounded-full inline-block">Kategoria</span>
+                    </div>
+
+                    <!-- Opis techniczny z solidnym tłem -->
+                    <div class="bg-slate-900/90 rounded-2xl p-4 border border-slate-800/80 space-y-3">
+                        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Specyfikacja techniczna</h4>
+                        <div class="grid grid-cols-2 gap-3 text-xs">
+                            <div class="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/50">
+                                <span class="text-slate-500 block">Skrzynia</span>
+                                <span id="modal-car-trans" class="font-bold text-white">Automatyczna</span>
+                            </div>
+                            <div class="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/50">
+                                <span class="text-slate-500 block">Rocznik</span>
+                                <span id="modal-car-year" class="font-bold text-white">2023</span>
+                            </div>
+                            <div class="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/50">
+                                <span class="text-slate-500 block">Klasa paliwa</span>
+                                <span id="modal-car-fuel" class="font-bold text-white">Benzyna / Hybrid</span>
+                            </div>
+                            <div class="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/50">
+                                <span class="text-slate-500 block">Zadowolenie</span>
+                                <span id="modal-car-rate" class="font-bold text-white">⭐️ 4.9 / 5</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Innowacyjna informacja o telemetrycznym kluczyku -->
+                    <div class="bg-blue-950/30 border border-blue-900/40 rounded-2xl p-4 flex items-start gap-3">
+                        <div class="w-10 h-10 rounded-full bg-blue-600/20 flex items-center justify-center text-blue-400 shrink-0">
+                            <i class="fa-solid fa-satellite-dish text-lg"></i>
+                        </div>
+                        <div class="space-y-0.5">
+                            <h5 class="text-sm font-semibold text-blue-300">Carent Smart-Key® Ready</h5>
+                            <p class="text-xs text-blue-400/80 leading-relaxed">Po udanej rezerwacji otrzymasz zdalny klucz PIN. Auto otworzysz, uruchomisz oraz zlokalizujesz bezpośrednio z Pulpitu aplikacji!</p>
+                        </div>
+                    </div>
+
+                    <!-- Podsumowanie płatności -->
+                    <div class="flex justify-between items-center bg-slate-900/80 p-4 rounded-2xl border border-slate-800/80">
+                        <div>
+                            <span class="text-[10px] text-slate-500 uppercase tracking-widest block font-bold">Cena podstawowa</span>
+                            <span id="modal-car-price" class="text-lg font-black text-white">od 149 PLN / doba</span>
+                        </div>
+                        <button onclick="confirmBookingFromModal()" class="bg-blue-600 hover:bg-blue-500 active:scale-95 transition-all text-xs font-bold text-white py-3 px-6 rounded-xl shadow-lg shadow-blue-900/30">
+                            Zarezerwuj teraz
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ZAKŁADKA 1: SZUKAJ (Główna) -->
+            <div id="tab-szukaj" class="tab-content flex-1 flex flex-col overflow-hidden">
+                <!-- Górny niebieski panel z formularzem -->
+                <div class="bg-gradient-to-b from-blue-700 to-blue-900 px-5 pt-4 pb-6 rounded-b-[35px] shadow-lg space-y-4 shrink-0">
+                    <div class="flex justify-between items-center">
+                        <span class="text-2xl font-black tracking-tight text-white flex items-center gap-1">
+                            <span class="text-emerald-400">Care</span>nt
+                        </span>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full">PRO</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h2 class="text-xl font-extrabold text-white">Znajdź wolny pojazd</h2>
+                        <p class="text-xs text-blue-200">Rezerwuj i otwieraj telefonem w 1 minutę.</p>
+                    </div>
+
+                    <!-- Filtrowanie Osobowe / Dostawcze -->
+                    <div class="bg-slate-950/40 p-1 rounded-xl flex border border-white/10">
+                        <button onclick="setCategoryFilter('osobowe')" id="btn-cat-osobowe" class="flex-1 py-1.5 rounded-lg text-xs font-bold transition-all bg-blue-600 text-white">Osobowe</button>
+                        <button onclick="setCategoryFilter('dostawcze')" id="btn-cat-dostawcze" class="flex-1 py-1.5 rounded-lg text-xs font-bold transition-all text-blue-200 hover:text-white">Dostawcze</button>
+                    </div>
+
+                    <!-- Formularz wyszukiwania z ulepszonym filtrowaniem typów -->
+                    <div class="space-y-2.5">
+                        <div class="bg-white rounded-xl flex items-center px-3.5 py-2.5 shadow-sm">
+                            <i class="fa-solid fa-location-dot text-blue-600 w-5"></i>
+                            <input type="text" placeholder="Lokalizacja (np. Katowice Dworzec)" class="w-full text-xs text-slate-800 font-medium bg-transparent border-none outline-none placeholder:text-slate-400">
+                        </div>
+                        <div class="bg-white rounded-xl flex items-center px-3.5 py-2.5 shadow-sm">
+                            <i class="fa-regular fa-calendar-days text-blue-600 w-5"></i>
+                            <input type="text" placeholder="Data (np. Dzisiaj 12:00 - Jutro 12:00)" class="w-full text-xs text-slate-800 font-medium bg-transparent border-none outline-none placeholder:text-slate-400">
+                        </div>
+                        <div class="bg-white rounded-xl flex items-center px-3.5 py-2.5 shadow-sm relative">
+                            <i class="fa-solid fa-car-side text-blue-600 w-5"></i>
+                            <select id="type-select-filter" onchange="applyTypeFilter(this.value)" class="w-full text-xs text-slate-800 font-bold bg-transparent border-none outline-none appearance-none pr-6">
+                                <option value="all">Wszystkie typy pojazdów</option>
+                                <option value="SUV">SUV</option>
+                                <option value="Sedan">Sedan / Hatchback</option>
+                                <option value="Kombi">Kombi</option>
+                                <option value="Furgon">Furgon / Dostawczy</option>
+                            </select>
+                            <i class="fa-solid fa-chevron-down text-slate-400 absolute right-4 text-[10px] pointer-events-none"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lista aut -->
+                <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4 no-scrollbar">
+                    <div class="flex justify-between items-center">
+                        <h3 id="current-section-title" class="text-sm font-extrabold text-slate-400 uppercase tracking-widest">Polecane auta</h3>
+                        <span id="reset-filter-btn" onclick="resetSearchFilters()" class="text-xs text-blue-400 hover:text-blue-300 font-bold cursor-pointer hidden">Wyczyść</span>
+                    </div>
+
+                    <!-- Siatka / Karuzela aut -->
+                    <div id="car-list-container" class="space-y-4 pb-4">
+                        <!-- Dynamicznie ładowana flota z JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- ZAKŁADKA 2: KALENDARZ (Rezerwacje) -->
+            <div id="tab-rezerwacje" class="tab-content hidden flex-1 flex flex-col overflow-hidden p-5 space-y-4">
+                <div class="space-y-1">
+                    <h2 class="text-xl font-extrabold">Twoje Rezerwacje</h2>
+                    <p class="text-xs text-slate-400">Kalendarz aktywności oraz rezerwacje terminów.</p>
+                </div>
+
+                <!-- Element Kalendarza -->
+                <div class="bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-3">
+                    <div class="flex justify-between items-center text-xs font-bold text-slate-400">
+                        <span>Czerwiec 2026</span>
+                        <div class="flex gap-2">
+                            <button class="hover:text-white"><i class="fa-solid fa-chevron-left"></i></button>
+                            <button class="hover:text-white"><i class="fa-solid fa-chevron-right"></i></button>
+                        </div>
+                    </div>
+
+                    <!-- Siatka kalendarza -->
+                    <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-500 border-b border-slate-850 pb-2">
+                        <span>Pn</span><span>Wt</span><span>Śr</span><span>Cz</span><span>Pt</span><span>So</span><span>Nd</span>
+                    </div>
+                    <div class="grid grid-cols-7 gap-1 text-center text-xs font-bold" id="calendar-grid">
+                        <!-- Dynamicznie generowane komórki dni w skrypcie JS -->
+                    </div>
+                </div>
+
+                <!-- Sekcja statusu aktywnej rezerwacji -->
+                <div class="bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-3 flex-1 overflow-y-auto no-scrollbar">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Status wynajmu</h3>
+                    
+                    <div id="no-booking-calendar-state" class="text-center py-8 space-y-3">
+                        <div class="w-12 h-12 bg-slate-850 rounded-full flex items-center justify-center mx-auto text-slate-500">
+                            <i class="fa-regular fa-calendar-times text-xl"></i>
+                        </div>
+                        <p class="text-xs text-slate-500 max-w-[200px] mx-auto">Nie masz obecnie zaplanowanych wynajmów. Przejdź do sekcji Szukaj, aby dokonać rezerwacji.</p>
+                    </div>
+
+                    <div id="active-booking-calendar-state" class="hidden space-y-3">
+                        <div class="flex items-center gap-3 bg-slate-950 p-3 rounded-xl border border-slate-800/50">
+                            <img id="cal-car-img" src="" class="w-16 h-10 object-contain" alt="">
+                            <div>
+                                <h4 id="cal-car-name" class="text-xs font-extrabold text-white">Skoda Octavia</h4>
+                                <span class="text-[10px] bg-emerald-600/20 text-emerald-400 px-2 py-0.5 rounded-full font-bold">Aktywna</span>
+                            </div>
+                        </div>
+                        <div class="text-xs text-slate-400 space-y-2">
+                            <div class="flex justify-between"><span>Dni wynajmu:</span><span class="text-white font-bold">20 - 24 Cze 2026</span></div>
+                            <div class="flex justify-between"><span>Klucz do auta:</span><span id="cal-car-pin" class="text-blue-400 font-black tracking-widest">PIN: 4829</span></div>
+                            <div class="flex justify-between"><span>Lokalizacja:</span><span class="text-white">Warszawa Modlin</span></div>
+                        </div>
+                        <button onclick="switchTab('pulpit')" class="w-full bg-blue-600 hover:bg-blue-500 py-2.5 rounded-xl text-xs font-bold text-white mt-1 transition-all">
+                            Przejdź do sterowania (Pulpit)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ZAKŁADKA 3: PULPIT (Wirtualny Klucz, Telemetria i Carent.OS) -->
+            <div id="tab-pulpit" class="tab-content hidden flex-1 flex flex-col overflow-hidden p-5 space-y-4">
+                
+                <!-- Widok blokady (Gdy brak aktywnego parowania z pojazdem) -->
+                <div id="pulpit-locked-view" class="flex-1 flex flex-col justify-center items-center text-center space-y-6">
+                    <div class="relative">
+                        <div class="w-24 h-24 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-600 text-3xl">
+                            <i id="lock-icon-main" class="fa-solid fa-key"></i>
+                        </div>
+                        <!-- Błysk zabezpieczenia -->
+                        <div class="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-blue-600/20 flex items-center justify-center border border-blue-500/40 text-[10px] font-bold text-blue-400">IoT</div>
+                    </div>
+                    
+                    <div class="space-y-2 max-w-[280px]">
+                        <h2 class="text-lg font-extrabold text-white">Sparuj wirtualny kluczyk</h2>
+                        <p id="pulpit-lock-desc" class="text-xs text-slate-400 leading-relaxed">Aby zarządzać pojazdem, wpisz 4-cyfrowy kod PIN przypisany do Twojej aktywnej rezerwacji.</p>
+                    </div>
+
+                    <!-- Blok kodu PIN -->
+                    <div class="space-y-4 w-full px-8">
+                        <input type="text" id="pin-input" maxlength="4" placeholder="Wpisz PIN" class="w-full text-center tracking-[1.5em] text-2xl font-black bg-slate-900 border border-slate-800 p-3 rounded-2xl text-blue-400 placeholder:tracking-normal placeholder:text-sm placeholder:font-semibold focus:outline-none focus:border-blue-500">
+                        <button onclick="tryPairVehicle()" class="w-full bg-blue-600 hover:bg-blue-500 active:scale-95 py-3 rounded-xl text-xs font-bold text-white transition-all shadow-lg shadow-blue-950/50">
+                            Autoryzuj i połącz z pojazdem
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Widok Aktywny (Po pomyślnym zalogowaniu PINem) -->
+                <div id="pulpit-active-view" class="hidden flex-1 flex flex-col overflow-hidden space-y-4">
+                    <!-- Informacja o połączonym aucie -->
+                    <div class="bg-slate-900 border border-slate-800/80 p-3.5 rounded-2xl flex justify-between items-center">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-emerald-600/10 flex items-center justify-center text-emerald-400">
+                                <i class="fa-solid fa-wifi"></i>
+                            </div>
+                            <div>
+                                <h4 id="hud-car-name" class="text-xs font-black text-white">Auto</h4>
+                                <span class="text-[9px] font-bold text-slate-500">POŁĄCZONO ONLINE (LTE)</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Mini wskaźnik statusu pojazdu -->
+                        <div class="flex items-center gap-2 bg-slate-950 px-2.5 py-1 rounded-full border border-slate-800">
+                            <span id="badge-lock-status" class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                            <span id="txt-lock-status" class="text-[9px] font-bold uppercase tracking-wider text-slate-400">Zaryglowany</span>
+                        </div>
+                    </div>
+
+                    <!-- Główny panel kontrolny (Zabezpieczone silnik/światła i wolny zamek) -->
+                    <div class="grid grid-cols-2 gap-3 shrink-0">
+                        <!-- Przycisk zamka (Teraz swobodne otwieranie bez blokowania ekranu) -->
+                        <button id="ctrl-lock-btn" onclick="toggleCentralLock()" class="bg-rose-900/20 hover:bg-rose-900/30 border border-rose-800/30 p-4 rounded-2xl flex flex-col items-center justify-center space-y-2 group transition-all">
+                            <div class="w-12 h-12 rounded-full bg-rose-900/30 flex items-center justify-center text-rose-400 text-xl group-hover:scale-105 transition-all">
+                                <i id="ctrl-lock-icon" class="fa-solid fa-lock"></i>
+                            </div>
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Zamek centralny</span>
+                            <span id="ctrl-lock-lbl" class="text-xs font-bold text-rose-400">ZAMKNIĘTY</span>
+                        </button>
+
+                        <!-- Przycisk silnika (Wymaga otwartego auta) -->
+                        <button id="ctrl-engine-btn" onclick="toggleEngine()" class="bg-slate-900 hover:bg-slate-850 border border-slate-800/80 p-4 rounded-2xl flex flex-col items-center justify-center space-y-2 group transition-all">
+                            <div class="w-12 h-12 rounded-full bg-slate-850 flex items-center justify-center text-slate-500 text-xl group-hover:scale-105 transition-all">
+                                <i class="fa-solid fa-power-off"></i>
+                            </div>
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Rozruch</span>
+                            <span id="ctrl-engine-lbl" class="text-xs font-bold text-slate-500">WYŁĄCZONY</span>
+                        </button>
+
+                        <!-- Klakson (Web Audio API) -->
+                        <button onclick="triggerHornSound()" class="bg-slate-900 hover:bg-slate-850 border border-slate-800/80 p-3.5 rounded-2xl flex flex-col items-center justify-center space-y-1.5 transition-all">
+                            <i class="fa-solid fa-volume-high text-slate-400 text-lg"></i>
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Zatąb</span>
+                            <span class="text-[9px] text-slate-500">Sygnał dźwiękowy</span>
+                        </button>
+
+                        <!-- Światła pozycyjne (Wymaga otwartego auta) -->
+                        <button id="ctrl-lights-btn" onclick="toggleLights()" class="bg-slate-900 hover:bg-slate-850 border border-slate-800/80 p-3.5 rounded-2xl flex flex-col items-center justify-center space-y-1.5 transition-all">
+                            <i class="fa-regular fa-lightbulb text-slate-400 text-lg"></i>
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Światła</span>
+                            <span id="ctrl-lights-lbl" class="text-[9px] text-slate-500">Reflektory wyłączone</span>
+                        </button>
+                    </div>
+
+                    <!-- Personalizacja kabiny: Kolor Ambient LED -->
+                    <div class="bg-slate-900 border border-slate-800/80 p-3 rounded-2xl space-y-2 shrink-0">
+                        <div class="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                            <span>Oświetlenie kabiny (Ambient LED)</span>
+                            <span id="led-color-name" class="text-blue-400 font-bold">Niebieski</span>
+                        </div>
+                        <div class="flex justify-between items-center gap-1.5 px-2">
+                            <button onclick="setAmbientColor('blue', '#2563eb')" class="w-6 h-6 rounded-full bg-blue-600 border border-white ring-2 ring-transparent transition-all"></button>
+                            <button onclick="setAmbientColor('red', '#dc2626')" class="w-6 h-6 rounded-full bg-red-600 border border-transparent hover:border-white transition-all"></button>
+                            <button onclick="setAmbientColor('green', '#16a34a')" class="w-6 h-6 rounded-full bg-emerald-600 border border-transparent hover:border-white transition-all"></button>
+                            <button onclick="setAmbientColor('orange', '#ea580c')" class="w-6 h-6 rounded-full bg-orange-600 border border-transparent hover:border-white transition-all"></button>
+                            <button onclick="setAmbientColor('purple', '#9333ea')" class="w-6 h-6 rounded-full bg-purple-600 border border-transparent hover:border-white transition-all"></button>
+                        </div>
+                    </div>
+
+                    <!-- Interaktywna mapa / Radar GPS -->
+                    <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-3 flex-1 flex flex-col overflow-hidden relative">
+                        <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Pozycja pojazdu (GPS)</h4>
+                        
+                        <!-- Makieta wirtualnej mapy w stylu Cyberpunk -->
+                        <div class="flex-1 w-full bg-slate-950 rounded-xl relative overflow-hidden border border-slate-850 flex items-center justify-center">
+                            <!-- Układ siatki kartograficznej -->
+                            <div class="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] opacity-40"></div>
+                            
+                            <!-- Pulsująca kropka lokalizacji samochodu -->
+                            <div class="absolute w-6 h-6 flex items-center justify-center z-10">
+                                <div class="absolute inset-0 bg-blue-500 rounded-full radar-wave"></div>
+                                <div class="w-2.5 h-2.5 bg-blue-400 rounded-full border border-white shadow-lg shadow-blue-500/80 z-20"></div>
+                            </div>
+
+                            <!-- Oznaczenia ulic/dzielnic -->
+                            <span class="absolute top-4 left-6 text-[8px] text-slate-600 font-bold uppercase tracking-widest">Aleje Jerozolimskie</span>
+                            <span class="absolute bottom-4 right-6 text-[8px] text-slate-600 font-bold uppercase tracking-widest">Sektor B / Parking Modlin</span>
+                            
+                            <!-- Kompas/Radar -->
+                            <div class="absolute border border-blue-500/10 rounded-full w-32 h-32"></div>
+                            <div class="absolute border border-blue-500/5 rounded-full w-48 h-48"></div>
+                        </div>
+                    </div>
+
+                    <!-- Innowacyjny Panel Konsoli IoT (Carent.OS wbudowany w Pulpit) -->
+                    <div class="bg-slate-950 border border-slate-850 p-2.5 rounded-xl font-mono text-[9px] text-emerald-400/90 space-y-1 overflow-y-auto no-scrollbar max-h-16 shrink-0">
+                        <div class="flex justify-between border-b border-slate-850 pb-1 text-slate-500">
+                            <span>Sygnał telemetryczny</span>
+                            <span>Carent.OS v1.42</span>
+                        </div>
+                        <div id="os-console-log">> System zabezpieczeń aktywny. Oczekiwanie na komendę...</div>
+                    </div>
+
+                    <!-- Przycisk Oddania Auta (Zamknięcie rezerwacji bezpośrednio z Pulpitu) -->
+                    <button onclick="terminateBooking()" class="w-full bg-rose-600 hover:bg-rose-500 active:scale-95 py-3 rounded-xl text-xs font-bold text-white transition-all shadow-lg shadow-rose-950/40 shrink-0">
+                        <i class="fa-solid fa-road-barrier mr-1.5"></i> Oddaj i rozlicz pojazd
+                    </button>
+                </div>
+            </div>
+
+            <!-- ZAKŁADKA 4: FLOTA (Wszystkie Pojazdy) -->
+            <div id="tab-flota" class="tab-content hidden flex-1 flex flex-col overflow-hidden p-5 space-y-4">
+                <div class="space-y-1">
+                    <h2 class="text-xl font-extrabold">Cała nasza flota</h2>
+                    <p class="text-xs text-slate-400 font-medium">Poznaj dostępne u nas modele aut osobowych oraz dostawczych.</p>
+                </div>
+
+                <!-- Mini podział na podkategorie floty -->
+                <div class="flex gap-2 overflow-x-auto no-scrollbar shrink-0 py-1">
+                    <button onclick="filterFleetCategory('wszystkie')" class="fleet-filter-btn px-3 py-1 bg-slate-900 border border-slate-800 text-xs font-bold rounded-lg text-white">Wszystkie</button>
+                    <button onclick="filterFleetCategory('SUV')" class="fleet-filter-btn px-3 py-1 bg-slate-900/50 border border-slate-800 text-xs font-bold rounded-lg text-slate-400">SUV</button>
+                    <button onclick="filterFleetCategory('Sedan')" class="fleet-filter-btn px-3 py-1 bg-slate-900/50 border border-slate-800 text-xs font-bold rounded-lg text-slate-400">Sedany</button>
+                    <button onclick="filterFleetCategory('Furgon')" class="fleet-filter-btn px-3 py-1 bg-slate-900/50 border border-slate-800 text-xs font-bold rounded-lg text-slate-400">Dostawcze</button>
+                </div>
+
+                <!-- Lista floty do przeglądania -->
+                <div class="flex-1 overflow-y-auto space-y-4 no-scrollbar pb-6" id="fleet-list-container">
+                    <!-- Dynamicznie generowana cała flota -->
+                </div>
+            </div>
+
+            <!-- ZAKŁADKA 5: KONTO (Profil użytkownika, Logowanie / Wylogowanie) -->
+            <div id="tab-konto" class="tab-content hidden flex-1 flex flex-col overflow-hidden p-5">
+                
+                <!-- Widok dla niezalogowanego użytkownika -->
+                <div id="account-logged-out" class="flex-1 flex flex-col justify-center space-y-6">
+                    <div class="text-center space-y-2">
+                        <div class="w-16 h-16 bg-blue-600/10 rounded-full flex items-center justify-center mx-auto text-blue-400 text-2xl">
+                            <i class="fa-regular fa-user"></i>
+                        </div>
+                        <h2 class="text-xl font-extrabold">Logowanie Klienta</h2>
+                        <p class="text-xs text-slate-400 max-w-[250px] mx-auto">Zaloguj się do swojego profilu, aby zarządzać rezerwacjami.</p>
+                    </div>
+
+                    <!-- Formularz Logowania -->
+                    <div class="space-y-3.5">
+                        <div class="space-y-1.5">
+                            <label class="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Adres E-mail</label>
+                            <input type="email" id="login-email" value="klient@carent.pl" class="w-full bg-slate-900 border border-slate-800 p-3 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div class="space-y-1.5">
+                            <label class="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Hasło</label>
+                            <input type="password" id="login-password" value="••••••••" class="w-full bg-slate-900 border border-slate-800 p-3 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-blue-500">
+                        </div>
+                        <button onclick="handleLogin()" class="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-xl text-xs font-bold text-white transition-all shadow-lg shadow-blue-900/20">
+                            Zaloguj się
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Widok dla zalogowanego użytkownika -->
+                <div id="account-logged-in" class="hidden flex-1 flex flex-col justify-between overflow-y-auto no-scrollbar py-2">
+                    <div class="space-y-5">
+                        <!-- Profil podsumowujący -->
+                        <div class="flex items-center gap-4 bg-slate-900 p-4 rounded-2xl border border-slate-800/80">
+                            <div class="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center font-bold text-white text-lg border border-blue-400">
+                                JK
+                            </div>
+                            <div>
+                                <h3 id="profile-name" class="text-sm font-extrabold text-white">Jan Kowalski</h3>
+                                <p class="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Premium Klient</p>
+                            </div>
+                        </div>
+
+                        <!-- Statystyki punktowe i EcoScore -->
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="bg-slate-900/80 p-3.5 rounded-2xl border border-slate-800/50 space-y-1">
+                                <span class="text-[9px] text-slate-500 uppercase tracking-widest font-bold block">Punkty Carent</span>
+                                <span class="text-lg font-black text-blue-400">1,250 pkt</span>
+                            </div>
+                            <div class="bg-slate-900/80 p-3.5 rounded-2xl border border-slate-800/50 space-y-1">
+                                <span class="text-[9px] text-slate-500 uppercase tracking-widest font-bold block">EcoScore</span>
+                                <span class="text-lg font-black text-emerald-400">92 / 100</span>
+                            </div>
+                        </div>
+
+                        <!-- Sekcja statusu dokumentów -->
+                        <div class="bg-slate-900/90 rounded-2xl p-4 border border-slate-800/80 space-y-3">
+                            <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Zweryfikowane uprawnienia</h4>
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-slate-800/50 text-xs">
+                                    <span class="text-slate-400">Prawo jazdy kat. B:</span>
+                                    <span class="text-emerald-400 font-bold flex items-center gap-1">
+                                        <i class="fa-solid fa-circle-check text-[10px]"></i> AKTYWNE
+                                    </span>
+                                </div>
+                                <div class="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-slate-800/50 text-xs">
+                                    <span class="text-slate-400">Profil Tożsamości mObywatel:</span>
+                                    <span class="text-emerald-400 font-bold flex items-center gap-1">
+                                        <i class="fa-solid fa-circle-check text-[10px]"></i> ZWERYFIKOWANY
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Przycisk wylogowania -->
+                    <button onclick="handleLogout()" class="w-full bg-slate-900 hover:bg-rose-900/20 hover:text-rose-400 hover:border-rose-900/50 py-3 rounded-xl text-xs font-bold text-slate-400 border border-slate-800 transition-all shadow-md">
+                        Wyloguj się
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- DOLNE INTERAKTYWNE MENU NAWIGACYJNE -->
+        <div class="h-20 bg-slate-950/95 backdrop-blur-md border-t border-slate-850 px-3 pb-4 flex justify-around items-center shrink-0 select-none z-40">
+            <button onclick="switchTab('szukaj')" id="nav-szukaj" class="nav-item flex flex-col items-center gap-1 text-[10px] font-semibold text-blue-500 transition-all">
+                <i class="fa-solid fa-magnifying-glass text-base"></i>
+                <span>Szukaj</span>
+            </button>
+            <button onclick="switchTab('rezerwacje')" id="nav-rezerwacje" class="nav-item flex flex-col items-center gap-1 text-[10px] font-semibold text-slate-500 transition-all">
+                <i class="fa-regular fa-calendar text-base"></i>
+                <span>Rezerwacje</span>
+            </button>
+            <button onclick="switchTab('pulpit')" id="nav-pulpit" class="nav-item flex flex-col items-center gap-1 text-[10px] font-semibold text-slate-500 transition-all relative">
+                <i class="fa-solid fa-key text-base"></i>
+                <span>Pulpit</span>
+                <!-- Pulsująca kropka sygnalizująca aktywny kluczyk -->
+                <span id="pulpit-active-dot" class="absolute top-0 right-1 w-2 h-2 rounded-full bg-blue-500 hidden animate-ping"></span>
+            </button>
+            <button onclick="switchTab('flota')" id="nav-flota" class="nav-item flex flex-col items-center gap-1 text-[10px] font-semibold text-slate-500 transition-all">
+                <i class="fa-solid fa-car text-base"></i>
+                <span>Flota</span>
+            </button>
+            <button onclick="switchTab('konto')" id="nav-konto" class="nav-item flex flex-col items-center gap-1 text-[10px] font-semibold text-slate-500 transition-all">
+                <i class="fa-regular fa-user text-base"></i>
+                <span>Konto</span>
+            </button>
+        </div>
+
+    </div>
+
+    <!-- Kontener Toast dla dynamicznych powiadomień -->
+    <div id="toast-wrapper" class="fixed bottom-6 right-6 z-[100] flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
+
+    <script>
+        // Aktywacja audio feedbacku
+        let isSoundEnabled = true;
+
+        // Baza danych aut (Dodano Volvo XC40 jako SUV do sekcji osobowe)
+        const flota = {
+            osobowe: [
+                {
+                    id: 1,
+                    name: "Toyota Yaris",
+                    year: 2021,
+                    trans: "automatyczna",
+                    rate: "4.0",
+                    price: "149",
+                    fuel: "Hybryda / Benzyna",
+                    type: "Sedan",
+                    img: "https://images.unsplash.com/photo-1654617783689-9e85155659da?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+                },
+                {
+                    id: 2,
+                    name: "Skoda Octavia",
+                    year: 2022,
+                    trans: "manualna",
+                    rate: "4.9",
+                    price: "189",
+                    fuel: "Benzyna",
+                    type: "Kombi",
+                    img: "https://images.unsplash.com/photo-1731752544100-30f1677b9866?q=80&w=1171&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+                },
+                {
+                    id: 3,
+                    name: "Volvo XC40",
+                    year: 2023,
+                    trans: "automatyczna",
+                    rate: "4.9",
+                    price: "249",
+                    fuel: "Hybryda (mHEV)",
+                    type: "SUV",
+                    img: "https://images.unsplash.com/photo-1664188288368-92de235c947a?q=80&w=1073&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+                },
+                {
+                    id: 4,
+                    name: "Renault Clio",
+                    year: 2022,
+                    trans: "manualna",
+                    rate: "4.3",
+                    price: "139",
+                    fuel: "Benzyna",
+                    type: "Sedan",
+                    img: "https://images.unsplash.com/photo-1666335009171-3ddc17937d6d?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+                }
+            ],
+            dostawcze: [
+                {
+                    id: 5,
+                    name: "Fiat Ducato Furgon",
+                    year: 2023,
+                    trans: "manualna",
+                    rate: "4.7",
+                    price: "149",
+                    fuel: "Diesel",
+                    type: "Furgon",
+                    img: "https://images.unsplash.com/photo-1692279952855-4a72ce767dd8?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+                },
+                {
+                    id: 6,
+                    name: "Mercedes Sprinter",
+                    year: 2022,
+                    trans: "automatyczna",
+                    rate: "4.9",
+                    price: "210",
+                    fuel: "Diesel",
+                    type: "Furgon",
+                    img: "https://images.unsplash.com/photo-1656426650699-a76ffe479608?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+                }
+            ]
+        };
+
+        // GŁÓWNY STAN SYSTEMU (State management)
+        let systemState = {
+            activeCategory: 'osobowe', // 'osobowe' | 'dostawcze'
+            activeTypeFilter: 'all',  // 'all' | 'SUV' | 'Sedan' | 'Kombi' | 'Furgon'
+            activeTab: 'szukaj',
+            isLogged: true, // Domyślnie zalogowany dla wygody testu
+            activeBooking: null, // { car: carObject, pin: "4829", isPaired: false, lockState: "locked", engineState: false, lightsState: false }
+            ambientColor: '#2563eb'
+        };
+
+        let currentSelectedCar = null;
+
+        // INICJALIZACJA SYSTEMU AUDIO (Synthesizer)
+        let audioCtx = null;
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        // Funkcje dźwiękowe Web Audio API
+        function playChime(type) {
+            try {
+                initAudio();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                if (type === 'unlock') {
+                    // Szybkie dwutonowe piknięcie na odblokowanie
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+                    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.15);
+
+                    setTimeout(() => {
+                        const osc2 = audioCtx.createOscillator();
+                        const gain2 = audioCtx.createGain();
+                        osc2.connect(gain2);
+                        gain2.connect(audioCtx.destination);
+                        osc2.type = 'sine';
+                        osc2.frequency.setValueAtTime(1046.5, audioCtx.currentTime); // C6
+                        gain2.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                        gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+                        osc2.start();
+                        osc2.stop(audioCtx.currentTime + 0.2);
+                    }, 80);
+                } else if (type === 'lock') {
+                    // Niższe podwójne piknięcie na zablokowanie
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(659.3, audioCtx.currentTime); // E5
+                    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.15);
+
+                    setTimeout(() => {
+                        const osc2 = audioCtx.createOscillator();
+                        const gain2 = audioCtx.createGain();
+                        osc2.connect(gain2);
+                        gain2.connect(audioCtx.destination);
+                        osc2.type = 'sine';
+                        osc2.frequency.setValueAtTime(523.3, audioCtx.currentTime); // C5
+                        gain2.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                        gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+                        osc2.start();
+                        osc2.stop(audioCtx.currentTime + 0.2);
+                    }, 80);
+                } else if (type === 'horn') {
+                    // Klasyczny klakson samochodowy (Dwuoscylatorowy)
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(440, audioCtx.currentTime); // A4
+                    
+                    const osc2 = audioCtx.createOscillator();
+                    osc2.type = 'triangle';
+                    osc2.frequency.setValueAtTime(445, audioCtx.currentTime);
+                    
+                    osc2.connect(gain);
+                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.2, audioCtx.currentTime + 0.25);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+                    
+                    osc.start();
+                    osc2.start();
+                    osc.stop(audioCtx.currentTime + 0.35);
+                    osc2.stop(audioCtx.currentTime + 0.35);
+                } else if (type === 'engine-start') {
+                    // Symulacja rozrusznika i rozruchu
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(60, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(140, audioCtx.currentTime + 0.6);
+                    gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.1, audioCtx.currentTime + 0.4);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.8);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.8);
+                }
+            } catch(e) {
+                console.log("Audio Error:", e);
+            }
+        }
+
+        // OBSŁUGA STRONY GŁÓWNEJ I KART POJAZDÓW
+        function renderMainFlota() {
+            const container = document.getElementById('car-list-container');
+            container.innerHTML = '';
+
+            let filteredList = flota[systemState.activeCategory];
+            if (systemState.activeTypeFilter !== 'all') {
+                filteredList = filteredList.filter(car => car.type === systemState.activeTypeFilter);
+            }
+
+            if (filteredList.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-10 bg-slate-900 rounded-2xl border border-slate-800">
+                        <i class="fa-solid fa-ban text-slate-600 text-2xl mb-2"></i>
+                        <p class="text-xs text-slate-500">Brak pojazdów spełniających kryteria.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            filteredList.forEach(car => {
+                container.innerHTML += `
+                    <div class="bg-slate-900 rounded-2xl p-4 border border-slate-800 flex flex-col space-y-3 hover:border-slate-700 transition-all">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <span class="bg-blue-600/10 text-blue-400 text-[10px] font-bold px-2 py-0.5 rounded-full">${car.type}</span>
+                                <h4 class="text-sm font-extrabold text-white mt-1">${car.name}</h4>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-xs text-slate-500">Doba od</span>
+                                <span class="block text-sm font-black text-white">${car.price} PLN</span>
+                            </div>
+                        </div>
+
+                        <div class="h-28 w-full bg-slate-950 rounded-xl p-1 flex items-center justify-center relative overflow-hidden">
+                            <img src="${car.img}" class="max-h-full max-w-full object-contain" alt="${car.name}">
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-2 text-[10px] text-slate-400">
+                            <span class="bg-slate-950 p-1.5 rounded-lg text-center font-semibold border border-slate-800/40">⚙️ ${car.trans}</span>
+                            <span class="bg-slate-950 p-1.5 rounded-lg text-center font-semibold border border-slate-800/40">📅 ${car.year}</span>
+                            <span class="bg-slate-950 p-1.5 rounded-lg text-center font-semibold border border-slate-800/40">⭐️ ${car.rate} / 5</span>
+                        </div>
+
+                        <button onclick="openCarDetails('${systemState.activeCategory}', ${car.id})" class="w-full bg-slate-800 hover:bg-slate-750 py-2 rounded-xl text-xs font-bold text-white transition-all">
+                            Pokaż szczegóły i wypożycz
+                        </button>
+                    </div>
+                `;
+            });
+        }
+
+        // RENDROWANIE KATALOGU FLOTY (ZAKŁADKA "FLOTA")
+        function renderFullFleet() {
+            const container = document.getElementById('fleet-list-container');
+            container.innerHTML = '';
+
+            // Połącz wszystkie typy pojazdów
+            let calaFlota = [...flota.osobowe, ...flota.dostawcze];
+            
+            // Renderuj
+            calaFlota.forEach(car => {
+                container.innerHTML += `
+                    <div class="bg-slate-900 rounded-2xl p-3.5 border border-slate-800 flex items-center gap-4 hover:border-slate-700 transition-all fleet-car-item" data-type="${car.type}">
+                        <img src="${car.img}" class="w-20 h-14 object-contain bg-slate-950 p-1 rounded-xl" alt="${car.name}">
+                        <div class="flex-1 space-y-0.5">
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-[8px] bg-slate-800 text-slate-400 font-extrabold px-1.5 py-0.5 rounded">${car.type}</span>
+                                <span class="text-[8px] bg-blue-600/10 text-blue-400 font-extrabold px-1.5 py-0.5 rounded">${car.fuel}</span>
+                            </div>
+                            <h4 class="text-xs font-bold text-white">${car.name}</h4>
+                            <p class="text-[10px] text-slate-500">od ${car.price} PLN / doba | ${car.trans}</p>
+                        </div>
+                        <button onclick="openCarDetails('${flota.osobowe.includes(car) ? 'osobowe' : 'dostawcze'}', ${car.id})" class="w-8 h-8 rounded-full bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white flex items-center justify-center transition-all">
+                            <i class="fa-solid fa-chevron-right text-xs"></i>
+                        </button>
+                    </div>
+                `;
+            });
+        }
+
+        function filterFleetCategory(type) {
+            // Zmiana klas aktywnych przycisków
+            document.querySelectorAll('.fleet-filter-btn').forEach(btn => {
+                btn.classList.replace('bg-slate-900', 'bg-slate-900/50');
+                btn.classList.replace('text-white', 'text-slate-400');
+            });
+
+            event.target.classList.replace('bg-slate-900/50', 'bg-slate-900');
+            event.target.classList.replace('text-slate-400', 'text-white');
+
+            const items = document.querySelectorAll('.fleet-car-item');
+            items.forEach(item => {
+                const itemType = item.getAttribute('data-type');
+                if (type === 'wszystkie' || itemType === type) {
+                    item.classList.remove('hidden');
+                } else {
+                    item.classList.add('hidden');
+                }
+            });
+        }
+
+        // OBSŁUGA SZCZEGÓŁÓW / MODALU
+        function openCarDetails(category, carId) {
+            const car = flota[category].find(c => c.id === carId);
+            if (!car) return;
+
+            currentSelectedCar = car;
+
+            document.getElementById('modal-car-img').src = car.img;
+            document.getElementById('modal-car-title').innerText = car.name;
+            document.getElementById('modal-car-badge').innerText = car.type;
+            document.getElementById('modal-car-trans').innerText = car.trans;
+            document.getElementById('modal-car-year').innerText = `Rok: ${car.year}`;
+            document.getElementById('modal-car-rate').innerText = `Ocena: ${car.rate}`;
+            document.getElementById('modal-car-fuel').innerText = car.fuel;
+            document.getElementById('modal-car-price').innerText = `od ${car.price} PLN / doba`;
+
+            const modal = document.getElementById('car-details-modal');
+            modal.classList.remove('translate-y-full');
+        }
+
+        function closeDetailsModal() {
+            const modal = document.getElementById('car-details-modal');
+            modal.classList.add('translate-y-full');
+        }
+
+        function confirmBookingFromModal() {
+            if (!systemState.isLogged) {
+                showToast("Najpierw musisz się zalogować na swoje konto!", "error");
+                switchTab('konto');
+                closeDetailsModal();
+                return;
+            }
+
+            // Generuj losowy kod PIN
+            const randomPIN = Math.floor(1000 + Math.random() * 9000).toString();
+            
+            systemState.activeBooking = {
+                car: currentSelectedCar,
+                pin: randomPIN,
+                isPaired: false,
+                lockState: "locked",
+                engineState: false,
+                lightsState: false
+            };
+
+            // Ustaw rezerwacje w kalendarzu
+            document.getElementById('no-booking-calendar-state').classList.add('hidden');
+            document.getElementById('active-booking-calendar-state').classList.remove('hidden');
+            document.getElementById('cal-car-img').src = currentSelectedCar.img;
+            document.getElementById('cal-car-name').innerText = currentSelectedCar.name;
+            document.getElementById('cal-car-pin').innerText = `PIN: ${randomPIN}`;
+
+            // Pokaż powiadomienie
+            showToast(`Rezerwacja pomyślna! Wirtualny klucz wygenerowany. PIN: ${randomPIN}`, "success");
+            
+            // Pokaż czerwoną kropkę nad Pulpitem
+            document.getElementById('pulpit-active-dot').classList.remove('hidden');
+
+            closeDetailsModal();
+            switchTab('rezerwacje');
+        }
+
+        // NAWIGACJA ZAKŁADEK (TAB-SWITCH)
+        function switchTab(targetTab) {
+            systemState.activeTab = targetTab;
+
+            // Ukryj wszystkie zakładki
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+            
+            // Pokaż docelową
+            document.getElementById(`tab-${targetTab}`).classList.remove('hidden');
+
+            // Zmień klasy dolnego menu
+            document.querySelectorAll('.nav-item').forEach(nav => {
+                nav.classList.remove('text-blue-500');
+                nav.classList.add('text-slate-500');
+            });
+            document.getElementById(`nav-${targetTab}`).classList.remove('text-slate-500');
+            document.getElementById(`nav-${targetTab}`).classList.add('text-blue-500');
+
+            // Logika specyficzna dla zakładki
+            if (targetTab === 'szukaj') {
+                renderMainFlota();
+            } else if (targetTab === 'flota') {
+                renderFullFleet();
+            } else if (targetTab === 'pulpit') {
+                // Usuń powiadomienie o kluczyku jeśli użytkownik wejdzie do pulpitu
+                document.getElementById('pulpit-active-dot').classList.add('hidden');
+                refreshPulpitUI();
+            }
+        }
+
+        // ZAALOKOWANIE FILTRÓW
+        function setCategoryFilter(cat) {
+            systemState.activeCategory = cat;
+            
+            // Podświetlenie odpowiedniego buttona
+            const oBtn = document.getElementById('btn-cat-osobowe');
+            const dBtn = document.getElementById('btn-cat-dostawcze');
+            
+            if (cat === 'osobowe') {
+                oBtn.className = "flex-1 py-1.5 rounded-lg text-xs font-bold transition-all bg-blue-600 text-white";
+                dBtn.className = "flex-1 py-1.5 rounded-lg text-xs font-bold transition-all text-blue-200 hover:text-white";
+                document.getElementById('current-section-title').innerText = "Polecane dla Ciebie";
+            } else {
+                oBtn.className = "flex-1 py-1.5 rounded-lg text-xs font-bold transition-all text-blue-200 hover:text-white";
+                dBtn.className = "flex-1 py-1.5 rounded-lg text-xs font-bold transition-all bg-blue-600 text-white";
+                document.getElementById('current-section-title').innerText = "Nasza Flota Dostawcza";
+            }
+
+            renderMainFlota();
+        }
+
+        function applyTypeFilter(val) {
+            systemState.activeTypeFilter = val;
+            
+            const resetBtn = document.getElementById('reset-filter-btn');
+            if (val !== 'all') {
+                resetBtn.classList.remove('hidden');
+                
+                // Automatyczna zmiana kategorii na dostawcze jeśli to furgon
+                if (val === 'Furgon') {
+                    setCategoryFilter('dostawcze');
+                    document.getElementById('btn-cat-dostawcze').click();
+                } else {
+                    setCategoryFilter('osobowe');
+                    document.getElementById('btn-cat-osobowe').click();
+                }
+            } else {
+                resetBtn.classList.add('hidden');
+            }
+
+            renderMainFlota();
+        }
+
+        function resetSearchFilters() {
+            systemState.activeTypeFilter = 'all';
+            document.getElementById('type-select-filter').value = 'all';
+            document.getElementById('reset-filter-btn').add('hidden');
+            renderMainFlota();
+        }
+
+        // DYNAMICZNY GENERATOR KALENDARZA
+        function buildCalendar() {
+            const grid = document.getElementById('calendar-grid');
+            grid.innerHTML = '';
+
+            // Generuj puste komórki na początek miesiąca (Czerwiec 2026 zaczyna się w Poniedziałek)
+            // Czerwiec 2026: 1 cze to Poniedziałek. Więc nie ma przesunięcia.
+            const totalDays = 30;
+            const rentalStartDay = 20;
+            const rentalEndDay = 24;
+
+            for (let i = 1; i <= totalDays; i++) {
+                let cellClass = "p-2 rounded-lg cursor-pointer text-slate-300 hover:bg-slate-800 transition-all";
+                let highlightClass = "";
+
+                // Podświetlenie okresu wynajmu
+                if (i >= rentalStartDay && i <= rentalEndDay) {
+                    cellClass = "p-2 rounded-lg cursor-pointer font-bold text-white relative";
+                    highlightClass = "bg-blue-600 shadow-md shadow-blue-500/30";
+                }
+
+                grid.innerHTML += `
+                    <div class="${cellClass} ${highlightClass}" onclick="showToast('Dzień: ${i} Czerwca 2026', 'info')">
+                        ${i}
+                        ${(i === 20) ? '<span class="absolute top-0 right-0 w-2 h-2 rounded-full bg-emerald-400"></span>' : ''}
+                    </div>
+                `;
+            }
+        }
+
+        // PANEL LOGOWANIA I KONTO
+        function handleLogin() {
+            systemState.isLogged = true;
+            document.getElementById('account-logged-out').classList.add('hidden');
+            document.getElementById('account-logged-in').classList.remove('hidden');
+            showToast("Zalogowano pomyślnie!", "success");
+        }
+
+        function handleLogout() {
+            systemState.isLogged = false;
+            document.getElementById('account-logged-in').classList.add('hidden');
+            document.getElementById('account-logged-out').classList.remove('hidden');
+            showToast("Wylogowano użytkownika.", "info");
+        }
+
+        // WYŚWIETLANIE TOAST
+        function showToast(message, type = "info") {
+            const wrapper = document.getElementById('toast-wrapper');
+            const toast = document.createElement('div');
+            toast.className = `p-3.5 rounded-xl shadow-xl flex items-center gap-3 text-xs font-bold transition-all duration-300 transform translate-y-2 opacity-0 pointer-events-auto border`;
+            
+            if (type === "success") {
+                toast.className += " bg-emerald-950/90 text-emerald-400 border-emerald-800/60";
+                toast.innerHTML = `<i class="fa-solid fa-circle-check text-base"></i><span>${message}</span>`;
+            } else if (type === "error") {
+                toast.className += " bg-rose-950/90 text-rose-400 border-rose-800/60";
+                toast.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-base"></i><span>${message}</span>`;
+            } else {
+                toast.className += " bg-slate-900/90 text-blue-400 border-slate-800/60";
+                toast.innerHTML = `<i class="fa-solid fa-circle-info text-base text-blue-400"></i><span>${message}</span>`;
+            }
+
+            wrapper.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 50);
+
+            setTimeout(() => {
+                toast.classList.add('translate-y-2', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // ZDALNE STEROWANIE I PAROWANIE (PULPIT)
+        function refreshPulpitUI() {
+            const booking = systemState.activeBooking;
+            const lockedView = document.getElementById('pulpit-locked-view');
+            const activeView = document.getElementById('pulpit-active-view');
+
+            if (!booking) {
+                // Brak rezerwacji
+                lockedView.classList.remove('hidden');
+                activeView.classList.add('hidden');
+                document.getElementById('pulpit-lock-desc').innerText = "Wypożycz samochód w sekcji 'Szukaj', aby otrzymać telemetrię i wirtualny klucz.";
+                document.getElementById('pin-input').style.display = 'none';
+                document.querySelector('[onclick="tryPairVehicle()"]').style.display = 'none';
+            } else if (!booking.isPaired) {
+                // Jest rezerwacja, czeka na sparowanie PIN-em
+                lockedView.classList.remove('hidden');
+                activeView.classList.add('hidden');
+                document.getElementById('pulpit-lock-desc').innerText = `Masz aktywną rezerwację na pojazd ${booking.car.name}. Wprowadź 4-cyfrowy kod PIN przypisany do rezerwacji (znajdziesz go też w zakładce 'Rezerwacje').`;
+                document.getElementById('pin-input').style.display = 'block';
+                document.querySelector('[onclick="tryPairVehicle()"]').style.display = 'block';
+            } else {
+                // Sparowano
+                lockedView.classList.add('hidden');
+                activeView.classList.remove('hidden');
+                document.getElementById('hud-car-name').innerText = booking.car.name;
+                updateVehicleControlsUI();
+            }
+        }
+
+        function tryPairVehicle() {
+            const pinVal = document.getElementById('pin-input').value;
+            const booking = systemState.activeBooking;
+
+            if (booking && pinVal === booking.pin) {
+                booking.isPaired = true;
+                playChime('unlock');
+                showToast("Pojazd pomyślnie sparowany z telefonem!", "success");
+                
+                // Konsola deweloperska Carent.OS
+                writeConsoleLog(`System Carent.OS połączony z ${booking.car.name}. Nawiązano połączenie IoT.`);
+                
+                refreshPulpitUI();
+            } else {
+                showToast("Błędny kod PIN! Spróbuj ponownie.", "error");
+            }
+        }
+
+        // LOGIKA KONSOLI IoT
+        function writeConsoleLog(msg) {
+            const logEl = document.getElementById('os-console-log');
+            if (logEl) {
+                logEl.innerHTML += `<br>> ${msg}`;
+                logEl.scrollTop = logEl.scrollHeight;
+            }
+        }
+
+        // CENTRALNY ZAMEK (Wolny, nie blokuje dostępu)
+        function toggleCentralLock() {
+            const booking = systemState.activeBooking;
+            if (!booking) return;
+
+            if (booking.lockState === "locked") {
+                // Odblokowanie
+                booking.lockState = "unlocked";
+                playChime('unlock');
+                showToast("Zamek centralny otwarty.", "success");
+                writeConsoleLog("Drzwi: Odblokowane.");
+            } else {
+                // Zablokowanie (gasi silnik i wyłącza światła przy okazji)
+                booking.lockState = "locked";
+                if (booking.engineState) {
+                    booking.engineState = false;
+                    writeConsoleLog("Silnik: Wyłączony automatycznie po zaryglowaniu.");
+                }
+                if (booking.lightsState) {
+                    booking.lightsState = false;
+                    writeConsoleLog("Światła: Wyłączone automatycznie po zaryglowaniu.");
+                }
+                playChime('lock');
+                showToast("Zamek centralny zablokowany. Zabezpieczono systemy.", "info");
+                writeConsoleLog("Drzwi: Zablokowane.");
+            }
+            updateVehicleControlsUI();
+        }
+
+        // URUCHAMIANIE SILNIKA (Wymaga otwartych drzwi)
+        function toggleEngine() {
+            const booking = systemState.activeBooking;
+            if (!booking) return;
+
+            // Sprawdzenie zabezpieczenia
+            if (booking.lockState === "locked") {
+                showToast("Błąd bezpieczeństwa: Drzwi auta są zablokowane!", "error");
+                writeConsoleLog("ODMOWA ROZRUCHU: Pojazd jest zamknięty!");
+                return;
+            }
+
+            booking.engineState = !booking.engineState;
+            if (booking.engineState) {
+                playChime('engine-start');
+                showToast("Silnik uruchomiony!", "success");
+                writeConsoleLog("Silnik: URUCHOMIONY.");
+            } else {
+                showToast("Silnik wyłączony.", "info");
+                writeConsoleLog("Silnik: Wyłączony.");
+            }
+            updateVehicleControlsUI();
+        }
+
+        // REFLEKTORY (Wymaga otwartych drzwi)
+        function toggleLights() {
+            const booking = systemState.activeBooking;
+            if (!booking) return;
+
+            // Sprawdzenie zabezpieczenia
+            if (booking.lockState === "locked") {
+                showToast("Błąd: Nie można włączyć świateł w zamkniętym aucie!", "error");
+                return;
+            }
+
+            booking.lightsState = !booking.lightsState;
+            if (booking.lightsState) {
+                showToast("Włączono reflektory (LED).", "success");
+                writeConsoleLog("Światła: Reflektory LED aktywne.");
+            } else {
+                showToast("Wyłączono reflektory.", "info");
+                writeConsoleLog("Światła: Reflektory LED nieaktywne.");
+            }
+            updateVehicleControlsUI();
+        }
+
+        // TRĄBIENIE KLAKSONEM
+        function triggerHornSound() {
+            playChime('horn');
+            showToast("Zatrąbiono!", "info");
+            writeConsoleLog("Klakson: Aktywowany sygnał ostrzegawczy.");
+        }
+
+        // KOLOR OŚWIETLENIA LED KABINY
+        function setAmbientColor(colorName, hex) {
+            systemState.ambientColor = hex;
+            document.getElementById('led-color-name').innerText = colorName.charAt(0).toUpperCase() + colorName.slice(1);
+            document.getElementById('led-color-name').style.color = hex;
+            showToast(`Zmieniono kolor oświetlenia na ${colorName}`, "info");
+            writeConsoleLog(`Ambient LED: Kolor ustawiony na ${colorName.toUpperCase()}.`);
+        }
+
+        // AKTUALIZACJA PRZYCISKÓW KONTROLNYCH (UI)
+        function updateVehicleControlsUI() {
+            const booking = systemState.activeBooking;
+            if (!booking) return;
+
+            // ZAMEK CENTRALNY
+            const lockBtn = document.getElementById('ctrl-lock-btn');
+            const lockIcon = document.getElementById('ctrl-lock-icon');
+            const lockLbl = document.getElementById('ctrl-lock-lbl');
+            const badgeLock = document.getElementById('badge-lock-status');
+            const txtLock = document.getElementById('txt-lock-status');
+
+            if (booking.lockState === 'unlocked') {
+                lockBtn.className = "bg-emerald-900/20 hover:bg-emerald-900/30 border border-emerald-800/30 p-4 rounded-2xl flex flex-col items-center justify-center space-y-2 group transition-all";
+                lockIcon.className = "fa-solid fa-lock-open text-emerald-400 text-xl group-hover:scale-105 transition-all";
+                lockLbl.innerText = "OTWARTY";
+                lockLbl.className = "text-xs font-bold text-emerald-400";
+                badgeLock.className = "w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse";
+                txtLock.innerText = "Otwarty";
+                txtLock.className = "text-[9px] font-bold uppercase tracking-wider text-emerald-400";
+            } else {
+                lockBtn.className = "bg-rose-900/20 hover:bg-rose-900/30 border border-rose-800/30 p-4 rounded-2xl flex flex-col items-center justify-center space-y-2 group transition-all";
+                lockIcon.className = "fa-solid fa-lock text-rose-400 text-xl group-hover:scale-105 transition-all";
+                lockLbl.innerText = "ZAMKNIĘTY";
+                lockLbl.className = "text-xs font-bold text-rose-400";
+                badgeLock.className = "w-1.5 h-1.5 rounded-full bg-rose-500";
+                txtLock.innerText = "Zaryglowany";
+                txtLock.className = "text-[9px] font-bold uppercase tracking-wider text-slate-400";
+            }
+
+            // ROZRUCH/ENGINE
+            const engBtn = document.getElementById('ctrl-engine-btn');
+            const engLbl = document.getElementById('ctrl-engine-lbl');
+
+            if (booking.engineState) {
+                engBtn.className = "bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 p-4 rounded-2xl flex flex-col items-center justify-center space-y-2 group transition-all";
+                engBtn.querySelector('div').className = "w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 text-xl group-hover:scale-105 transition-all animate-pulse";
+                engLbl.innerText = "URUCHOMIONY";
+                engLbl.className = "text-xs font-bold text-emerald-400";
+            } else {
+                engBtn.className = "bg-slate-900 hover:bg-slate-850 border border-slate-800/80 p-4 rounded-2xl flex flex-col items-center justify-center space-y-2 group transition-all";
+                engBtn.querySelector('div').className = "w-12 h-12 rounded-full bg-slate-850 flex items-center justify-center text-slate-500 text-xl group-hover:scale-105 transition-all";
+                engLbl.innerText = "WYŁĄCZONY";
+                engLbl.className = "text-xs font-bold text-slate-500";
+            }
+
+            // REFLEKTORY/LIGHTS
+            const ligBtn = document.getElementById('ctrl-lights-btn');
+            const ligLbl = document.getElementById('ctrl-lights-lbl');
+
+            if (booking.lightsState) {
+                ligBtn.className = "bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 p-3.5 rounded-2xl flex flex-col items-center justify-center space-y-1.5 transition-all";
+                ligBtn.querySelector('i').className = "fa-solid fa-lightbulb text-blue-400 text-lg animate-pulse";
+                ligLbl.innerText = "Światła pozycyjne włączone";
+                ligLbl.className = "text-[9px] text-blue-400 font-semibold";
+            } else {
+                ligBtn.className = "bg-slate-900 hover:bg-slate-850 border border-slate-800/80 p-3.5 rounded-2xl flex flex-col items-center justify-center space-y-1.5 transition-all";
+                ligBtn.querySelector('i').className = "fa-regular fa-lightbulb text-slate-400 text-lg";
+                ligLbl.innerText = "Reflektory wyłączone";
+                ligLbl.className = "text-[9px] text-slate-500";
+            }
+        }
+
+        // ODDAWANIE SAMOCHODU (Rozliczenie podróży z Pulpitu)
+        function terminateBooking() {
+            const booking = systemState.activeBooking;
+            if (!booking) return;
+
+            // Zabezpieczenie fizyczne przed oddaniem (Gaszenie silnika, zamykanie drzwi)
+            booking.engineState = false;
+            booking.lightsState = false;
+            booking.lockState = "locked";
+            playChime('lock');
+
+            showToast(`Pojazd ${booking.car.name} został zamknięty i pomyślnie oddany. Dziękujemy!`, "success");
+            
+            // Wyczyść stan rezerwacji
+            systemState.activeBooking = null;
+
+            // Przywróć stan kalendarza
+            document.getElementById('no-booking-calendar-state').classList.remove('hidden');
+            document.getElementById('active-booking-calendar-state').classList.add('hidden');
+            document.getElementById('pin-input').value = '';
+
+            refreshPulpitUI();
+            switchTab('szukaj');
+        }
+
+        // START APLIKACJI
+        window.onload = function() {
+            renderMainFlota();
+            buildCalendar();
+        };
+    </script>
+</body>
+</html>
